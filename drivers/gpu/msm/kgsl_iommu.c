@@ -1,4 +1,5 @@
 /* Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -439,7 +440,6 @@ static int _iommu_unmap_sync_pc(struct kgsl_pagetable *pt,
 	size_t unmapped = 0;
 
 	_iommu_sync_mmu_pc(true);
-
 	/*
 	 * Take iommu unmap fast path if CX GDSC is in OFF state.
 	 */
@@ -1566,7 +1566,8 @@ static int kgsl_iommu_init(struct kgsl_mmu *mmu)
 	struct kgsl_device *device = KGSL_MMU_DEVICE(mmu);
 	struct kgsl_iommu *iommu = _IOMMU_PRIV(mmu);
 	struct kgsl_iommu_context *ctx = &iommu->ctx[KGSL_IOMMU_CONTEXT_USER];
-	int status;
+	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
+	int status, i;
 
 	mmu->features |= KGSL_MMU_PAGED;
 
@@ -1594,6 +1595,19 @@ static int kgsl_iommu_init(struct kgsl_mmu *mmu)
 	/* Check to see if we need to do the IOMMU sync dance */
 	need_iommu_sync = of_property_read_bool(device->pdev->dev.of_node,
 		"qcom,gpu-quirk-iommu-sync");
+
+	/*
+	 * Try to preserve the SMMU regulator if HW can support
+	 * unmap fast path.
+	 */
+	if (MMU_FEATURE(mmu, KGSL_MMU_UNMAP_FAST)) {
+		for (i = 0; i < KGSL_MAX_REGULATORS; i++) {
+			if (!strcmp(pwr->regulators[i].name, "vddcx")) {
+				iommu->vddcx_regulator =
+					pwr->regulators[i].reg;
+			}
+		}
+	}
 
 	iommu->regbase = ioremap(iommu->regstart, iommu->regsize);
 	if (iommu->regbase == NULL) {
@@ -2731,6 +2745,7 @@ static const struct {
 	{ "qcom,global_pt", KGSL_MMU_GLOBAL_PAGETABLE },
 	{ "qcom,hyp_secure_alloc", KGSL_MMU_HYP_SECURE_ALLOC },
 	{ "qcom,force-32bit", KGSL_MMU_FORCE_32BIT },
+	{ "qcom,unmap_fast", KGSL_MMU_UNMAP_FAST },
 };
 
 static int _kgsl_iommu_probe(struct kgsl_device *device,

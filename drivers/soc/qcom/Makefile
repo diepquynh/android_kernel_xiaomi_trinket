@@ -81,6 +81,7 @@ ifdef CONFIG_MSM_SUBSYSTEM_RESTART
        obj-y += microdump_collector.o
        obj-$(CONFIG_QTI_GVM_QUIN) += subsystem_notif_virt.o
 endif
+obj-$(CONFIG_CPUMAXFREQ) += cpumaxfreq.o
 obj-$(CONFIG_QCOM_EUD) += eud.o
 obj-$(CONFIG_QSEE_IPC_IRQ) += qsee_ipc_irq.o
 obj-$(CONFIG_QSEE_IPC_IRQ_BRIDGE) += qsee_ipc_irq_bridge.o
@@ -123,3 +124,6 @@ obj-$(CONFIG_WCNSS_CORE) += wcnss/
 obj-$(CONFIG_RENAME_BLOCK_DEVICE) += rename_block_device.o
 obj-$(CONFIG_QTI_CRYPTO_COMMON) += crypto-qti-common.o
 obj-$(CONFIG_QTI_CRYPTO_TZ) += crypto-qti-tz.o
+obj-y += secboot_fuse.o
+obj-y += serial_num.o
+obj-y += cpu_feature_id.o

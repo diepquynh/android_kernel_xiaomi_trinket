@@ -61,6 +61,7 @@
 #include <asm/processor.h>
 #include <asm/scs.h>
 #include <asm/stacktrace.h>
+#include <wt_sys/wt_boot_reason.h>
 
 #ifdef CONFIG_CC_STACKPROTECTOR
 #include <linux/stackprotector.h>
@@ -260,6 +261,15 @@ void __show_regs(struct pt_regs *regs)
 	print_symbol("pc : %s\n", regs->pc);
 	print_symbol("lr : %s\n", lr);
 	printk("sp : %016llx pstate : %08llx\n", sp, regs->pstate);
+#ifdef CONFIG_WT_BOOT_REASON
+	if (wt_panic_oops == 1) {
+		save_panic_key_log_symbol("PC is at %s,", regs->pc);
+		save_panic_key_log(" [<%016llx>] \n", regs->pc);
+		save_panic_key_log_symbol("LR is at %s,", lr);
+		save_panic_key_log(" [<%016llx>] \n", lr);
+		wt_panic_oops = 0;
+	}
+#endif
 
 	i = top_reg;
 

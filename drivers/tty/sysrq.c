@@ -10,6 +10,7 @@
  *	based upon discusions in irc://irc.openprojects.net/#kernelnewbies
  *
  *	Copyright (c) 2010 Dmitry Torokhov
+ *	Copyright (C) 2020 XiaoMi, Inc.
  *	Input handler conversion
  */
 
@@ -53,6 +54,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/irq_regs.h>
+#include <wt_sys/wt_boot_reason.h>
 
 /* Whether we react on sysrq keys or just ignore them */
 static int __read_mostly sysrq_enabled = CONFIG_MAGIC_SYSRQ_DEFAULT_ENABLE;
@@ -137,6 +139,10 @@ static void sysrq_handle_crash(int key)
 {
 	/* release the RCU read lock before crashing */
 	rcu_read_unlock();
+
+#ifdef CONFIG_WT_BOOT_REASON
+	save_panic_key_log("Sysrq: Trigger a crash\n");
+#endif
 
 	panic("sysrq triggered crash\n");
 }

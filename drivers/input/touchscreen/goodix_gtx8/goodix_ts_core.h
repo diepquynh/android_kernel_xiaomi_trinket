@@ -38,6 +38,7 @@
 #include <linux/completion.h>
 #include <linux/debugfs.h>
 #include <linux/of_irq.h>
+#include <linux/pm_qos.h>
 #include <linux/input/touch-info.h>
 #ifdef CONFIG_OF
 #include <linux/of_gpio.h>
@@ -431,6 +432,8 @@ struct goodix_ts_core {
 
 	struct notifier_block ts_notifier;
 	struct goodix_ts_esd ts_esd;
+
+	struct pm_qos_request pm_qos_req;
 
 #ifdef CONFIG_FB
 	struct notifier_block msm_drm_notifier;

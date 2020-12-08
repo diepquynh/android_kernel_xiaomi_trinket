@@ -1028,6 +1028,7 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 	mutex_unlock(&goodix_modules.mutex);
 
 	/* read touch data from touch device */
+	pm_qos_update_request(&core_data->pm_qos_req, 100);
 	r = ts_dev->hw_ops->event_handler(ts_dev, ts_event);
 	if (likely(r >= 0)) {
 		if (ts_event->event_type == EVENT_TOUCH) {
@@ -1036,6 +1037,7 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 					&ts_event->event_data.touch_data);
 		}
 	}
+	pm_qos_update_request(&core_data->pm_qos_req, PM_QOS_DEFAULT_VALUE);
 
 	return IRQ_HANDLED;
 }
@@ -2064,6 +2066,9 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	tid_ops->grip_area_set = tid_grip_area_set;
 	tid_ops->get_version = tid_get_version;
 
+	pm_qos_add_request(&core_data->pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
+			PM_QOS_DEFAULT_VALUE);
+
 	r = goodix_ts_power_init(core_data);
 	if (r < 0)
 		goto out;
@@ -2122,6 +2127,7 @@ static int goodix_ts_probe(struct platform_device *pdev)
 		return r;
 
 out:
+	pm_qos_remove_request(&core_data->pm_qos_req);
 	ts_info("goodix_ts_probe OUT, r:%d", r);
 	return r;
 }
@@ -2134,6 +2140,8 @@ static int goodix_ts_remove(struct platform_device *pdev)
 	goodix_ts_power_off(core_data);
 	goodix_debugfs_exit();
 	goodix_ts_sysfs_exit(core_data);
+	pm_qos_remove_request(&core_data->pm_qos_req);
+
 	return 0;
 }
 

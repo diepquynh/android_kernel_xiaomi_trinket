@@ -1028,7 +1028,8 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 	mutex_unlock(&goodix_modules.mutex);
 
 	/* read touch data from touch device */
-	pm_qos_update_request(&core_data->pm_qos_req, 100);
+	pm_qos_update_request(&core_data->pm_touch_req, 100);
+	pm_qos_update_request(&core_data->pm_i2c_req, 100);
 	r = ts_dev->hw_ops->event_handler(ts_dev, ts_event);
 	if (likely(r >= 0)) {
 		if (ts_event->event_type == EVENT_TOUCH) {
@@ -1037,7 +1038,8 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 					&ts_event->event_data.touch_data);
 		}
 	}
-	pm_qos_update_request(&core_data->pm_qos_req, PM_QOS_DEFAULT_VALUE);
+	pm_qos_update_request(&core_data->pm_i2c_req, PM_QOS_DEFAULT_VALUE);
+	pm_qos_update_request(&core_data->pm_touch_req, PM_QOS_DEFAULT_VALUE);
 
 	return IRQ_HANDLED;
 }
@@ -2027,6 +2029,7 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	struct goodix_ts_device *ts_device;
 	struct touch_info_dev *tid;
 	struct touch_info_dev_operations *tid_ops;
+	unsigned int i2c_irq;
 	int r;
 	u8 read_val = 0;
 
@@ -2065,9 +2068,6 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	tid_ops->fod_status_set = tid_fod_status_set;
 	tid_ops->grip_area_set = tid_grip_area_set;
 	tid_ops->get_version = tid_get_version;
-
-	pm_qos_add_request(&core_data->pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
-			PM_QOS_DEFAULT_VALUE);
 
 	r = goodix_ts_power_init(core_data);
 	if (r < 0)
@@ -2112,6 +2112,18 @@ static int goodix_ts_probe(struct platform_device *pdev)
 		goto out;
 	}
 
+	i2c_irq = goodix_i2c_irq();
+
+	core_data->pm_i2c_req.type = PM_QOS_REQ_AFFINE_IRQ;
+	core_data->pm_i2c_req.irq = i2c_irq;
+	pm_qos_add_request(&core_data->pm_i2c_req, PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_DEFAULT_VALUE);
+
+	core_data->pm_touch_req.type = PM_QOS_REQ_AFFINE_IRQ;
+	core_data->pm_touch_req.irq = core_data->irq;
+	pm_qos_add_request(&core_data->pm_touch_req, PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_DEFAULT_VALUE);
+
 	/*unified protocl
 	 * start a thread to parse cfg_bin and init IC*/
 	r = goodix_start_cfg_bin(core_data);
@@ -2127,7 +2139,8 @@ static int goodix_ts_probe(struct platform_device *pdev)
 		return r;
 
 out:
-	pm_qos_remove_request(&core_data->pm_qos_req);
+	pm_qos_remove_request(&core_data->pm_i2c_req);
+	pm_qos_remove_request(&core_data->pm_touch_req);
 	ts_info("goodix_ts_probe OUT, r:%d", r);
 	return r;
 }
@@ -2140,7 +2153,8 @@ static int goodix_ts_remove(struct platform_device *pdev)
 	goodix_ts_power_off(core_data);
 	goodix_debugfs_exit();
 	goodix_ts_sysfs_exit(core_data);
-	pm_qos_remove_request(&core_data->pm_qos_req);
+	pm_qos_remove_request(&core_data->pm_i2c_req);
+	pm_qos_remove_request(&core_data->pm_touch_req);
 
 	return 0;
 }

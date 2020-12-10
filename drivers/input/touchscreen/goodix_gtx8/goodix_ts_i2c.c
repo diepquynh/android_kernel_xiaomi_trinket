@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/platform_device.h>
+#include <linux/i2c/i2c-msm-v2.h>
 #include <linux/interrupt.h>
 #include "goodix_ts_core.h"
 #include "goodix_cfg_bin.h"
@@ -2153,6 +2154,15 @@ static int goodix_i2c_probe(struct i2c_client *client,
 	ts_info("goodix_i2c_probe OUT");
 
 	return r;
+}
+
+unsigned int goodix_i2c_irq(void)
+{
+	struct i2c_msm_ctrl *ctrl;
+
+	ctrl = goodix_pdev->dev.parent->parent->driver_data;
+
+	return ctrl->rsrcs.irq;
 }
 
 static int goodix_i2c_remove(struct i2c_client *client)

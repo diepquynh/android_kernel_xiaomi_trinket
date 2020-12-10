@@ -433,7 +433,8 @@ struct goodix_ts_core {
 	struct notifier_block ts_notifier;
 	struct goodix_ts_esd ts_esd;
 
-	struct pm_qos_request pm_qos_req;
+	struct pm_qos_request pm_i2c_req;
+	struct pm_qos_request pm_touch_req;
 
 #ifdef CONFIG_FB
 	struct notifier_block msm_drm_notifier;
@@ -738,6 +739,8 @@ extern void goodix_msg_printf(const char *fmt, ...);
 
 extern int sync_read_rawdata( unsigned int reg,
 		unsigned char *data, unsigned int len);
+
+unsigned int goodix_i2c_irq(void);
 
 extern int goodix_tools_register(void);
 extern int goodix_tools_unregister(void);

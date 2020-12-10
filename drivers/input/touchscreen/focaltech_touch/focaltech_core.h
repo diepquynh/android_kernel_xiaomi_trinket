@@ -163,7 +163,8 @@ struct fts_ts_data {
     struct mutex report_mutex;
     struct mutex bus_lock;
 
-	struct pm_qos_request pm_qos_req;
+    struct pm_qos_request pm_i2c_req;
+    struct pm_qos_request pm_touch_req;
 
     int irq;
     int log_level;

@@ -38,6 +38,7 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
+#include <linux/i2c/i2c-msm-v2.h>
 #if defined(CONFIG_FB)
 #include <linux/msm_drm_notify.h>
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
@@ -747,7 +748,8 @@ static void fts_irq_read_report(void)
 	fts_prc_queue_work(ts_data);
 #endif
 
-	pm_qos_update_request(&ts_data->pm_qos_req, 100);
+	pm_qos_update_request(&ts_data->pm_touch_req, 100);
+	pm_qos_update_request(&ts_data->pm_i2c_req, 100);
 	ret = fts_read_parse_touchdata(ts_data);
 	if (ret == 0) {
 		mutex_lock(&ts_data->report_mutex);
@@ -758,7 +760,8 @@ static void fts_irq_read_report(void)
 #endif
 		mutex_unlock(&ts_data->report_mutex);
 	}
-	pm_qos_update_request(&ts_data->pm_qos_req, PM_QOS_DEFAULT_VALUE);
+	pm_qos_update_request(&ts_data->pm_i2c_req, PM_QOS_DEFAULT_VALUE);
+	pm_qos_update_request(&ts_data->pm_touch_req, PM_QOS_DEFAULT_VALUE);
 
 #if FTS_ESDCHECK_EN
 	fts_esdcheck_set_intr(0);
@@ -1452,9 +1455,10 @@ static void fts_ts_late_resume(struct early_suspend *handler)
 
 
 
-static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
+static int fts_ts_probe_entry(struct i2c_client *client, struct fts_ts_data *ts_data)
 {
 	int ret = 0;
+	struct i2c_msm_ctrl *ctrl;
 	int pdata_size = sizeof(struct fts_ts_platform_data);
 
 	FTS_FUNC_ENTER();
@@ -1580,8 +1584,17 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
 	}
 #endif
 
-	pm_qos_add_request(&ts_data->pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
-			PM_QOS_DEFAULT_VALUE);
+	ctrl = client->dev.parent->driver_data;
+
+	ts_data->pm_i2c_req.type = PM_QOS_REQ_AFFINE_IRQ;
+	ts_data->pm_i2c_req.irq = ctrl->rsrcs.irq;
+	pm_qos_add_request(&ts_data->pm_i2c_req, PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_DEFAULT_VALUE);
+
+	ts_data->pm_touch_req.type = PM_QOS_REQ_AFFINE_IRQ;
+	ts_data->pm_touch_req.irq = ts_data->irq;
+	pm_qos_add_request(&ts_data->pm_touch_req, PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_DEFAULT_VALUE);
 
 	ret = fts_irq_registration(ts_data);
 	if (ret) {
@@ -1619,7 +1632,8 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
 	return 0;
 
 err_irq_req:
-	pm_qos_remove_request(&ts_data->pm_qos_req);
+	pm_qos_remove_request(&ts_data->pm_i2c_req);
+	pm_qos_remove_request(&ts_data->pm_touch_req);
 #if FTS_POWER_SOURCE_CUST_EN
 err_power_init:
 	fts_power_source_exit(ts_data);
@@ -1682,7 +1696,8 @@ static int fts_ts_remove_entry(struct fts_ts_data *ts_data)
 	free_irq(ts_data->irq, ts_data);
 	input_unregister_device(ts_data->input_dev);
 
-	pm_qos_remove_request(&ts_data->pm_qos_req);
+	pm_qos_remove_request(&ts_data->pm_i2c_req);
+	pm_qos_remove_request(&ts_data->pm_touch_req);
 
 	if (ts_data->ts_workqueue)
 		destroy_workqueue(ts_data->ts_workqueue);
@@ -2036,7 +2051,7 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	tid_ops->get_version = tid_get_version;
 
 	i2c_set_clientdata(client, ts_data);
-	ret = fts_ts_probe_entry(ts_data);
+	ret = fts_ts_probe_entry(client, ts_data);
 	if (ret) {
 		FTS_ERROR("Touch Screen(I2C BUS) driver probe fail");
 		kfree_safe(ts_data);

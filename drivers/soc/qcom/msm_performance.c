@@ -27,6 +27,11 @@
 #include <linux/kthread.h>
 #include <linux/sched/core_ctl.h>
 
+#ifdef CONFIG_DYNAMIC_STUNE_BOOST
+static bool stune_boost_active;
+static int boost_slot;
+#endif
+
 /*
  * Sched will provide the data for every 20ms window,
  * will collect the data for 15 windows(300ms) and then update
@@ -61,6 +66,7 @@ static int set_cpu_min_freq(const char *buf, const struct kernel_param *kp)
 	struct cpu_status *i_cpu_stats;
 	struct cpufreq_policy policy;
 	cpumask_var_t limit_mask;
+	bool boosted = false;
 
 	while ((cp = strpbrk(cp + 1, " :")))
 		ntokens++;
@@ -100,13 +106,29 @@ static int set_cpu_min_freq(const char *buf, const struct kernel_param *kp)
 		if (cpufreq_get_policy(&policy, i))
 			continue;
 
-		if (cpu_online(i) && (policy.min != i_cpu_stats->min))
-			cpufreq_update_policy(i);
+		if (cpu_online(i)) {
+			if (policy.min != i_cpu_stats->min)
+				cpufreq_update_policy(i);
+
+			if (!boosted && i_cpu_stats->min != 0 &&
+			    policy.cpuinfo.min_freq != i_cpu_stats->min)
+				boosted = true;
+		}
 
 		for_each_cpu(j, policy.related_cpus)
 			cpumask_clear_cpu(j, limit_mask);
 	}
 	put_online_cpus();
+
+#ifdef CONFIG_DYNAMIC_STUNE_BOOST
+	if (boosted && !stune_boost_active) {
+		if (!do_stune_boost("top-app", 10, &boost_slot))
+			stune_boost_active = true;
+	} else if (!boosted && stune_boost_active) {
+		reset_stune_boost("top-app", boost_slot);
+		stune_boost_active = false;
+	}
+#endif
 
 	return 0;
 }
